@@ -1,0 +1,25 @@
+; *** define architecture ***
+#region architecture_specs
+; define bit width of instructions and addresses
+instruction_width		1
+address_width				2
+
+
+; define size (in bytes) of program rom
+decoder_rom		1		16 16
+program_rom		1		15 8
+
+
+; *** define registers first ***
+register		8		a, b, c, dl, dh, al, ah
+register		16		pc, ra, dx, ax
+register		16		sp, wi, ri
+
+
+; *** define flags ***
+flag flag_c, flag_v, flag_z, flag_s, flag_d
+
+
+; *** define external devices ***
+device device0, device1, device2, device3, device4, device5, device6, device7, device8, device9, device10
+#endregion
