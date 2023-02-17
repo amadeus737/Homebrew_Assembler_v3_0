@@ -372,11 +372,11 @@ public:
 
 				bool isAddress = parser::instance().try_strip_indirect(tokenString);
 
-				if (tokenString[0] == '|')
+				if (tokenString[0] == '|' && label != OPCODE_ALIAS_STR)
 				{
 					op = Operation::OR;
 				}
-				else if (tokenString[0] == '=')
+				else if (tokenString[0] == '=' && label != OPCODE_ALIAS_STR)
 				{
 					continue;
 				}
@@ -428,7 +428,7 @@ public:
 							std::cout << "					*** Adding a dereferenced register value argument = " << newArg._string << "\n";
 					}
 				}
-				else
+				else if (label != OPCODE_ALIAS_STR)
 				{
 					if (num == -1)
 						num = 0;
@@ -456,7 +456,7 @@ public:
 
 		assembler.addOpcode(parsedValue, opcode);
 
-		if (num != -1)
+		if (num != -1 && label != OPCODE_ALIAS_STR)
 		{
 			controlPattern cp;
 			cp.pattern = num;
@@ -482,20 +482,130 @@ public:
 					std::cout << ", ";
 			}
 
-			std::cout << " -- val = $";
-			std::cout << hex2 << opcode.value();
-			std::cout << ", control sequence : ";
+			if (label != OPCODE_ALIAS_STR)
+				std::cout << " -- val = $";
+			else
+				std::cout << " -- to existing opcode with val = $";
 
-			for (int i = 0; i < opcode.numCycles(); i++)
+			std::cout << hex2 << opcode.value();
+
+			if (label != OPCODE_ALIAS_STR)
 			{
-				for (int j = 0; j < opcode.getPatterns(i).cpattern[0].flags.size(); i++)
+				std::cout << ", control sequence : ";
+				for (int i = 0; i < opcode.numCycles(); i++)
 				{
-					controlPattern p = opcode.getPatterns(i).cpattern[0];
-					std::cout << "              " << dec << i << ": $" << hex8 << p.pattern << " and flag pattern = " << p.flags[j] << "\n";
+					for (int j = 0; j < opcode.getPatterns(i).cpattern[0].flags.size(); i++)
+					{
+						controlPattern p = opcode.getPatterns(i).cpattern[0];
+						std::cout << "              " << dec << i << ": $" << hex8 << p.pattern << " and flag pattern = " << p.flags[j] << "\n";
+					}
 				}
 			}
 
 			std::cout << ", unique_str = " << opcode.getUniqueString() << "\n";
+		}
+	}
+};
+
+class archOpcodeSeq : public command
+{
+public:
+	void process(assembler& assembler, const std::string& label, std::string remainder, int line) const override
+	{
+		bool tokensRemain = true;
+		bool colonFound = false;
+		Operation op = Operation::None;
+
+		assembler.lastAddedFlags.clear();
+
+		controlPattern cp;
+		int num = 0;
+		while (tokensRemain)
+		{
+			auto nextToken = parser::instance().extract_token_ws_comma(remainder);
+
+			if (nextToken.has_value())
+			{
+				std::string tokenString = std::string(nextToken.value());
+
+				if (tokenString[0] == ':')
+				{
+					colonFound = true;
+				}
+				else if (tokenString[0] == '|')
+				{
+					op = Operation::OR;
+				}
+				else if (tokenString[0] == '=')
+				{
+					continue;
+				}
+				else
+				{
+					if (!colonFound && label == OPCODE_SEQ_IF_STR)
+					{
+						int nFlags = assembler.getFlagCount();
+						for (int i = 0; i < pow(2, nFlags); i++)
+						{
+							std::string currFlag = std::bitset<5>(i).to_string();
+
+							bool patternMatch = true;
+							for (int j = 0; j < nFlags; j++)
+							{
+								bool digit_j_matches = tokenString[j] == 'x' || tokenString[j] == currFlag[j];
+								patternMatch = patternMatch && digit_j_matches;
+							}
+
+							if (patternMatch)
+							{
+								cp.flags.push_back(i);
+								assembler.lastAddedFlags.push_back(i);
+							}
+						}
+					}
+					else if (op == Operation::OR)
+					{
+						if (tokenString[0] == '_')
+							num = num ^ assembler.getSymbolAddress(tokenString);
+						else
+							num = num | assembler.getSymbolAddress(tokenString);
+
+						op = Operation::None;
+					}
+					else
+					{
+						num = assembler.getSymbolAddress(tokenString);
+					}
+				}
+			}
+			else
+			{
+				tokensRemain = false;
+			}
+		}
+
+		cp.pattern = num;
+
+		if (label == OPCODE_SEQ_STR) cp.type = PatternType::Seq;
+		if (label == OPCODE_SEQ_IF_STR) cp.type = PatternType::Seq_If;
+		if (label == OPCODE_SEQ_ELSE_STR) cp.type = PatternType::Seq_Else;
+
+		if (label != OPCODE_SEQ_IF_STR)
+		{
+			for (int i = 0; i < pow(2, assembler.getFlagCount()); i++)
+			{
+				cp.flags.push_back(i);
+			}
+		}
+
+		assembler.addNewControlPatternToCurrentOpcode(cp);
+
+		opcode opcode = assembler.getOpcode(assembler.lastOpcodeIndex());
+
+		if (assembler.echoParsedMajor() && assembler.echoArchitecture())
+		{
+			for (int i = 0; i < cp.flags.size(); i++)
+				std::cout << "              *** new cycle added = $" << hex8 << num << " with flag pattern = " << cp.flags[i] << "\n";
 		}
 	}
 };

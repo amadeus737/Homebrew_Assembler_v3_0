@@ -30,6 +30,10 @@ void assembler::registerOperations()
 	registerArchTag<archFlagDevice>(DEVICE_STR);
 	registerArchTag<archControlLine>(CONTROL_STR);
 	registerArchTag<archOpcode>(OPCODE_STR);
+	registerArchTag<archOpcode>(OPCODE_ALIAS_STR);
+	registerArchTag<archOpcodeSeq>(OPCODE_SEQ_STR);
+	registerArchTag<archOpcodeSeq>(OPCODE_SEQ_IF_STR);
+	registerArchTag<archOpcodeSeq>(OPCODE_SEQ_ELSE_STR);
 
 	registerInstruction<opcodeInstruction>(OPCODE_STR);
 }
@@ -309,6 +313,11 @@ void assembler::addToLastControlPatternInCurrentOpcode(controlPattern cp)
 bool assembler::isAMnemonic(const std::string& s)
 {
 	return std::find(_mnemonics.begin(), _mnemonics.end(), s) != _mnemonics.end();
+}
+
+opcode& assembler::getOpcode(int v)
+{
+	return _opcodes[v];
 }
 
 int assembler::getValueByUniqueOpcodeString(const std::string& m)
