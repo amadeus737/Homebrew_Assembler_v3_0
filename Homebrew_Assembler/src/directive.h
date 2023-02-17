@@ -1,12 +1,12 @@
 #pragma once
 
 #include "assembler.h"
-#include "symbol.h"
+#include "command.h"
 
 #include <iomanip>
 #include <sstream>
 
-class includeDirective : public symbol
+class includeDirective : public command
 {
 public:
 	void process(assembler& a, const std::string& d, std::string remainder, int line) const override
@@ -51,7 +51,7 @@ public:
 	}
 };
 
-class originDirective : public symbol
+class originDirective : public command
 {
 public:
 	void process(assembler& a, const std::string& d, std::string remainder, int line) const override
@@ -74,7 +74,7 @@ public:
 				a.setAddress(parsedValue);
 
 				if (a.echoParsedMajor())
-					std::cout << "          *** Setting Address to $" << std::setfill('0') << std::setw(8) << std::hex << std::uppercase << parsedValue << "\n\n";
+					std::cout << "          *** Setting Address to $" << hex8 << parsedValue << "\n\n";
 			}
 			catch (const std::exception& e)
 			{

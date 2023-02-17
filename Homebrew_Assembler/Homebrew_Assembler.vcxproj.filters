@@ -32,19 +32,28 @@
     <ClInclude Include="src\parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\symbolConfig.h">
+    <ClInclude Include="src\config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="code\fake0.s">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\symbol.h">
+    <ClInclude Include="src\command.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\directive.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\archDefinition.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\opcode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\symbol.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

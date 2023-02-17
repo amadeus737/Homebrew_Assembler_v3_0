@@ -1,12 +1,15 @@
 #pragma once
 
 #include "assembler.h"
-#include "symbol.h"
+#include "command.h"
 #include "parser.h"
+#include "opcode.h"
 
 #include <sstream>
 
-class archBitWidth : public symbol
+enum Operation { None, OR, AND, NOT, EQUALITY };
+
+class archBitWidth : public command
 {
 public:
 	void process(assembler& assembler, const std::string& label, std::string remainder, int line) const override
@@ -44,7 +47,7 @@ public:
 	}
 };
 
-class archRom : public symbol
+class archRom : public command
 {
 public:
 	void process(assembler& assembler, const std::string& label, std::string remainder, int line) const override
@@ -97,7 +100,6 @@ public:
 			throw std::exception(msg.str().c_str());
 		}
 
-
 		bool write = std::stoi(std::string(writeToken.value())) == 1;
 
 		if (assembler.echoParsedMajor() && assembler.echoArchitecture())
@@ -116,15 +118,15 @@ public:
 			std::cout << "\n";
 		}
 
-	//	if (label == DECODER_ROM_STR)
-			//assembler.AddDecoderRom(write, stoi(inSizeToken.value()), stoi(outSizeToken.value()));
+		if (label == DECODER_ROM_STR)
+			assembler.addDecoderRom(write, stoi(inSizeToken.value()), stoi(outSizeToken.value()));
 
-	//	if (label == PROGRAM_ROM_STR)
-			//assembler.AddProgramRom(write, stoi(inSizeToken.value()), stoi(outSizeToken.value()));
+		if (label == PROGRAM_ROM_STR)
+			assembler.addProgramRom(write, stoi(inSizeToken.value()), stoi(outSizeToken.value()));
 	}
 };
 
-class archRegister : public symbol
+class archRegister : public command
 {
 public:
 	void process(assembler& assembler, const std::string& label, std::string remainder, int line) const override
@@ -156,7 +158,7 @@ public:
 				if (assembler.echoParsedMajor() && assembler.echoArchitecture())
 					std::cout << "          *** Adding " << std::string(sizeToken.value()) << "-bit Register [" << nameTokenString << "]\n";
 
-			//	assembler.addRegister(nameTokenString, stoi(std::string(sizeToken.value())), line);
+				assembler.addRegister(nameTokenString, stoi(std::string(sizeToken.value())), line);
 			}
 			else
 			{
@@ -169,7 +171,7 @@ public:
 	}
 };
 
-class archFlagDevice : public symbol
+class archFlagDevice : public command
 {
 public:
 	void process(assembler& assembler, const std::string& label, std::string remainder, int line) const override
@@ -188,14 +190,11 @@ public:
 						std::cout << "          *** Adding flag [" << nameTokenString << "]\n";
 
 					if (label == DEVICE_STR)
-						std::cout << "          *** Adding decice [" << nameTokenString << "]\n";
+						std::cout << "          *** Adding device [" << nameTokenString << "]\n";
 				}
 
-				//if (label == FLAG_STR)
-					//	assembler.AddFlag(nameTokenString, assembler.GetFlagCount() + 1, line);
-
-				//if (label == DEVICE_STR)
-					//	assembler.AddDevice(nameTokenString, assembler.GetFlagCount() + 1, line);
+				if (label == FLAG_STR)
+						assembler.addFlag(nameTokenString, assembler.getFlagCount() + 1, line);
 			}
 			else
 			{
@@ -205,5 +204,126 @@ public:
 
 		if (assembler.echoParsedMajor() && assembler.echoArchitecture())
 			std::cout << "\n";
+	}
+};
+
+class archControlLine : public command
+{
+public:
+	void process(assembler& assembler, const std::string& label, std::string remainder, int line) const override
+	{
+		auto nameToken = parser::instance().extract_token_ws(remainder);
+		if (!nameToken.has_value())
+		{
+			std::stringstream msg;
+			msg << "Assembling command " << label << " at line <" << line << ">! No label provided for control line!";
+			throw std::exception(msg.str().c_str());
+		}
+
+		if (std::string(nameToken.value()) == "fetch")
+			std::cout << "";
+
+		bool tokensRemain = true;
+		int firstNum = -1;
+		int op = 0;
+		int secondNum = -1;
+		while (tokensRemain)
+		{
+			// Get the rest of 
+			auto nextToken = parser::instance().extract_token_ws_comma(remainder);
+			if (nextToken.has_value())
+			{
+				std::string tokenString = std::string(nextToken.value());
+				LiteralNumType type = parser::instance().get_num_type(tokenString);
+
+				if (type != LiteralNumType::None)
+				{
+					int num = parser::instance().parse_literal_num(tokenString, type);
+					if (num != -1)
+					{
+						if (op == 0) firstNum = num;
+						else         secondNum = num;
+					}
+					else
+					{
+						std::stringstream msg;
+						msg << "Assembling command " << label << " at line <" << line << ">! Bad int literal parse type!";
+						throw std::exception(msg.str().c_str());
+					}
+				}
+				else
+				{
+					if (tokenString[0] == '<' && tokenString[1] == '<') op = -1;
+					else if (tokenString[0] == '>' && tokenString[1] == '>') op = 1;
+					else
+					{
+						if (!isdigit(tokenString.c_str()[0]))
+						{
+							if (tokenString[0] == '|')
+							{
+								op = Operation::OR;
+							}
+							else if (tokenString[0] == '=')
+							{
+								continue;
+							}
+							else
+							{
+								if (firstNum == -1)
+									firstNum = 0;
+
+								if (op == Operation::OR)
+								{
+									if (tokenString[0] == '_')
+										firstNum = firstNum ^ assembler.getSymbolAddress(tokenString);
+									else
+										firstNum = firstNum | assembler.getSymbolAddress(tokenString);
+
+									op = Operation::None;
+								}
+								else
+								{
+									firstNum = assembler.getSymbolAddress(tokenString);
+								}
+							}
+						}
+						else
+						{
+							std::stringstream msg;
+							msg << "Assembling command " << label << " at line <" << line << ">! Expected a symbol reference -- found !" << tokenString;
+							throw std::exception(msg.str().c_str());
+						}
+					}
+				}
+			}
+			else
+			{
+				tokensRemain = false;
+			}
+		}
+
+		int finalNum = -1;
+		if (op != 0)
+		{
+			if (op == -1) finalNum = firstNum << secondNum;
+			if (op == 1)  finalNum = firstNum >> secondNum;
+		}
+		else
+		{
+			finalNum = firstNum;
+		}
+
+		if (assembler.echoParsedMajor())
+		{
+			std::cout << "          *** Saving control line = ";
+			std::cout << " = $" << hex8 << finalNum;
+
+			if (assembler.echoParsedMinor())
+				std::cout << " = %" << std::bitset<sizeof(int) * 8>(finalNum);
+
+			std::cout << "\n\n";
+		}
+
+		assembler.addControlLine(std::string(nameToken.value()), finalNum, line);
 	}
 };

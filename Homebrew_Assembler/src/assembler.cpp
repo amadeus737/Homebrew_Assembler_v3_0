@@ -1,6 +1,6 @@
 #include "assembler.h"
 #include "parser.h"
-#include "symbolConfig.h"
+#include "config.h"
 #include "directive.h"
 #include "archDefinition.h"
 
@@ -22,11 +22,12 @@ void assembler::registerOperations()
 
 	registerArchDefinition<archBitWidth>(INSTRUCTION_WIDTH_STR);
 	registerArchDefinition<archBitWidth>(ADDRESS_WIDTH_STR);
+	registerArchDefinition<archRom>(DECODER_ROM_STR);
+	registerArchDefinition<archRom>(PROGRAM_ROM_STR);
 	registerArchDefinition<archRegister>(REGISTER_STR);
 	registerArchDefinition<archFlagDevice>(FLAG_STR);
 	registerArchDefinition<archFlagDevice>(DEVICE_STR);
-	registerArchDefinition<archRom>(DECODER_ROM_STR);
-	registerArchDefinition<archRom>(PROGRAM_ROM_STR);
+	registerArchDefinition<archControlLine>(CONTROL_STR);
 }
 
 void assembler::assemble()
@@ -145,7 +146,7 @@ void assembler::processLine(std::string& line, int linenum, std::optional<std::s
 		return;
 	}
 
-	if (parser::instance().is_symbol(token.value()))
+	if (parser::instance().is_command(token.value()))
 	{
 	/*	if (_symbols.count(token.value()) > 0)
 		{
@@ -190,42 +191,158 @@ void assembler::setEcho(unsigned char e)
 	_echo_rom_data = (e & 0x01) == 0x01;     // $0000 0001
 }
 
-bool assembler::echoArchitecture()
+SymbolType assembler::getSymbolType(const std::string& n)
 {
-	return _echo_architecture;
+	std::map<std::string, symbol>::iterator i = _symbols.find(n);
+
+	if (i != _symbols.end())
+		return (i->second).getType();
+
+	return SymbolType::None;
 }
 
-bool assembler::echoMajorTasks()
+int assembler::getSymbolAddress(const std::string& n) const
 {
-	return _echo_major_tasks;
+	auto i = _symbols.find(n);
+	return (i->second).getAddress();
 }
 
-bool assembler::echoMinorTasks()
+const std::vector<int>& assembler::getSymbolAddresses(SymbolType t)
 {
-	return _echo_minor_tasks;
+	switch (t)
+	{
+	case SymbolType::Constant:
+		return _constantAddresses;
+
+	case SymbolType::Variable:
+		return _variableAddresses;
+
+	case SymbolType::Label:
+		return _labelAddresses;
+
+	case SymbolType::Register:
+		return _registerAddresses;
+
+	case SymbolType::Flag:
+		return _flagAddresses;
+
+	case SymbolType::ControlLine:
+		return _controlLineAddresses;
+	}
 }
 
-bool assembler::echoWarnings()
+void assembler::addConstant(const std::string& n, int a, int l)
 {
-	return _echo_warnings;
+	_symbols.emplace(n, symbol::makeConstant(n, a, l));
+	_constantAddresses.push_back(a);
 }
 
-bool assembler::echoSource()
+void assembler::addVariable(const std::string& n, int a, int l)
 {
-	return _echo_source;
+	_symbols.emplace(n, symbol::makeVariable(n, a, l));
+	_variableAddresses.push_back(a);
 }
 
-bool assembler::echoParsedMajor()
+void assembler::addLabel(const std::string& n, int a, int l)
 {
-	return _echo_parsed_major;
+	_symbols.emplace(n, symbol::makeLabel(n, a, l));
+	_labelAddresses.push_back(a);
 }
 
-bool assembler::echoParsedMinor()
+void assembler::addRegister(const std::string& n, int a, int l)
 {
-	return _echo_parsed_minor;
+	_symbols.emplace(n, symbol::makeRegister(n, a, l));
+	_registerAddresses.push_back(a);
 }
 
-bool assembler::echoRomData()
+void assembler::addFlag(const std::string& n, int a, int l)
 {
-	return _echo_rom_data;
+	_symbols.emplace(n, symbol::makeFlag(n, a, l));
+	_nFlags++;
+
+	_flagAddresses.push_back(a);
+}
+
+void assembler::addControlLine(const std::string& n, int a, int l)
+{
+	_symbols.emplace(n, symbol::makeControlLine(n, a, l));
+
+	_controlLineAddresses.push_back(a);
+
+	if (a > _maxControlLineValue) _maxControlLineValue = a;
+}
+
+void assembler::addOpcode(int v, const opcode& oc)
+{
+	_lastOpcodeIndex = v;
+	_opcodes.emplace(v, oc);
+
+	if (v > _maxOpcodeValue) _maxOpcodeValue = v;
+
+	_mnemonics.push_back(_opcodes[v].mnemonic());
+	//registerInstruction<archOpcode>(_opcodes[v].getUniqueString());
+}
+
+void assembler::addOpcodeAlias(int v, const opcode& oca)
+{
+	_opcode_aliases.emplace(v, oca);
+
+	_mnemonics.push_back(_opcode_aliases[v].mnemonic());
+	//registerInstruction<archOpcode>(_opcode_aliases[v].getUniqueString());
+}
+
+void assembler::addNewControlPatternToCurrentOpcode(controlPattern cp)
+{
+	_opcodes[_lastOpcodeIndex].addNewControlPattern(cp);
+	if (_opcodes[_lastOpcodeIndex].numCycles() > _maxNumCycles) _maxNumCycles = _opcodes[_lastOpcodeIndex].numCycles();
+}
+
+void assembler::addToLastControlPatternInCurrentOpcode(controlPattern cp)
+{
+	_opcodes[_lastOpcodeIndex].addToLastControlPattern(cp);
+}
+
+bool assembler::isAMnemonic(const std::string& s)
+{
+	return std::find(_mnemonics.begin(), _mnemonics.end(), s) != _mnemonics.end();
+}
+
+int assembler::getValueByUniqueOpcodeString(const std::string& m)
+{
+	for (auto it = _opcodes.begin(); it != _opcodes.end(); ++it)
+		if (it->second.getUniqueString() == m)
+			return it->first;
+}
+
+int assembler::getValueByUniqueOpcodeAliasString(const std::string& m)
+{
+	for (auto it = _opcode_aliases.begin(); it != _opcode_aliases.end(); ++it)
+		if (it->second.getUniqueString() == m)
+			return it->first;
+}
+
+int assembler::numOpcodeCycles()
+{
+	return _opcodes[_lastOpcodeIndex].numArgs();
+}
+
+int assembler::lastOpcodeIndex()
+{
+	return _lastOpcodeIndex;
+}
+
+void assembler::addDecoderRom(bool write, int inputs, int outputs)
+{
+	_write_decode_rom = write;
+	_in_bits_decode = inputs;
+	_out_bits_decode = outputs;
+}
+
+void assembler::addProgramRom(bool write, int inputs, int outputs)
+{
+	int size = outputs * pow(2, inputs);
+
+	_write_program_rom = write;
+	_in_bits_program = inputs;
+	_out_bits_program = outputs;
 }

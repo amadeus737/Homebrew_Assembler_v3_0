@@ -1,11 +1,11 @@
 #include "parser.h"
-#include "symbolConfig.h"
+#include "config.h"
 
 #include <algorithm>
 
 // symbols are sorta like commands...they cannot start with a digit and can contain any non-register alphanumeric or underscore
 // characters
-bool parser::is_symbol(const std::string& s)
+bool parser::is_command(const std::string& s)
 {
 	return s.size() > 0 &&
 		!isdigit(s.front()) &&
@@ -43,6 +43,21 @@ bool parser::is_label(const std::string& s)
 		std::any_of(s.begin(), std::prev(s.end()), [](char c) { return isalnum(c); });
 }
 
+// Indirect values start with INDIRECT_BEGIN_KEY and end with INDIRECT_END_KEY
+bool parser::is_indirect(const std::string& s)
+{
+	return s.size() > 1 && s.front() == INDIRECT_BEGIN_KEY && s.back() == INDIRECT_END_KEY;
+}
+
+// Addresses must start with the ADDRESS_KEY and the remaining characters must follow the rules
+// for a name (see below)
+bool parser::is_address(const std::string& s)
+{
+	return s.size() > 1 &&
+		s.front() == ADDRESS_KEY &&
+		is_command(s.substr(1, std::string::npos));
+}
+
 // erase any strings starting with the character specified by the COMMENT_KEY (see symbolConfig.h)
 void parser::strip_comment(std::string& s)
 {
@@ -54,6 +69,74 @@ void parser::strip_comment(std::string& s)
 	{
 		s.erase(pos);
 	}
+}
+
+// Strip indirectly addressed values by only returning the characters between the INDIRECT_BEGIN_KEY and INDIRECT_END_KEY
+bool parser::try_strip_indirect(std::string & s)
+{
+	if (is_indirect(s))
+	{
+		s = std::string(std::next(s.begin()), std::prev(s.end()));
+		return true;
+	}
+
+	return false;
+}
+
+bool parser::try_strip_label(std::string& s)
+{
+	if (is_label(s))
+	{
+		s = std::string(s.begin(), std::prev(s.end()));
+		return true;
+	}
+
+	return false;
+}
+
+// Strip off the address key
+bool parser::try_strip_address(std::string& s)
+{
+	if (is_address(s))
+	{
+		s = std::string(std::next(s.begin()), s.end());
+		return true;
+	}
+
+	return false;
+}
+
+// Find and erase commas, return whether or not one is found
+bool parser::try_consume_comma(std::string& s)
+{
+	const auto ws = std::find_if(s.begin(), s.end(), [](char c) { return !isspace(c); });
+	if (ws != s.end())
+	{
+		if (*ws == ',')
+		{
+			s.erase(s.begin(), std::next(ws));
+			return true;
+		}
+	}
+
+	return false;
+}
+
+// Same idea as above, but for the equals sign
+bool parser::try_consume_equals(std::string& s)
+{
+	const auto ws = std::find_if(s.begin(), s.end(), [](char c) { return !isspace(c); });
+
+	if (ws != s.end())
+	{
+		if (*ws == '=')
+		{
+			s.erase(s.begin(), std::next(ws));
+			return true;
+		}
+	}
+
+	return false;
 }
 
 // One of the primary functions used in the parser...it will extract a "token", defined as a collection
@@ -206,6 +289,27 @@ void parser::trim_ws(std::string& s)
 {
 	trim_leading_ws(s);
 	trim_trailing_ws(s);
+}
+
+// Return the modified string with leading spaces parsed out
+std::string parser::get_lead_trimmed(std::string s)
+{
+	trim_leading_ws(s);
+	return s;
+}
+
+// Return the modified string with trailing spaces parsed out
+std::string parser::get_trail_trimmed(std::string s)
+{
+	trim_trailing_ws(s);
+	return s;
+}
+
+// Return the modified string with spaces parsed out on both sides
+std::string parser::get_trimmed(std::string s)
+{
+	trim_ws(s);
+	return s;
 }
 
 // Check the token string for the different literal number types supported in this assembler
