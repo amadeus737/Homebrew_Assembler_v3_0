@@ -161,10 +161,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="code\fake0.s" />
-    <ClInclude Include="src\archDefinition.h" />
+    <ClInclude Include="src\archtag.h" />
     <ClInclude Include="src\command.h" />
     <ClInclude Include="src\assembler.h" />
     <ClInclude Include="src\directive.h" />
+    <ClInclude Include="src\instruction.h" />
     <ClInclude Include="src\opcode.h" />
     <ClInclude Include="src\parser.h" />
     <ClInclude Include="src\symbol.h" />

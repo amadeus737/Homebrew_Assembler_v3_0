@@ -327,3 +327,175 @@ public:
 		assembler.addControlLine(std::string(nameToken.value()), finalNum, line);
 	}
 };
+
+class archOpcode : public command
+{
+public:
+	virtual void process(assembler& assembler, const std::string& label, std::string remainder, int line) const override
+	{
+		opcode opcode;
+
+		auto valueToken = parser::instance().extract_token_ws_comma(remainder);
+		if (!valueToken.has_value())
+		{
+			std::stringstream msg;
+			msg << "Assembling command " << label << " at line <" << line << ">! Opcode is not assigned a valid value!";
+			throw std::exception(msg.str().c_str());
+		}
+
+		std::string valueString = std::string(valueToken.value());
+		int parsedValue = parser::instance().parse_literal_num(valueString);
+
+		opcode.setValue(parsedValue);
+
+		auto nameToken = parser::instance().extract_token_ws_comma(remainder);
+		if (!nameToken.has_value())
+		{
+			std::stringstream msg;
+			msg << "Assembling command " << label << " at line <" << line << ">! Opcode is not assigned a valid label!";
+			throw std::exception(msg.str().c_str());
+		}
+
+		opcode.setMnemonic(std::string(nameToken.value()));
+
+		bool tokensRemain = true;
+		Operation op = Operation::None;
+		int seq = 0;
+		int num = -1;
+		while (tokensRemain)
+		{
+			auto nextToken = parser::instance().extract_token_ws_comma(remainder);
+
+			if (nextToken.has_value())
+			{
+				std::string tokenString = std::string(nextToken.value());
+
+				bool isAddress = parser::instance().try_strip_indirect(tokenString);
+
+				if (tokenString[0] == '|')
+				{
+					op = Operation::OR;
+				}
+				else if (tokenString[0] == '=')
+				{
+					continue;
+				}
+				else if (tokenString[0] == '#')
+				{
+					opcode::arg newArg;
+					if (isAddress)
+					{
+						newArg._type = ArgType::DerefNum;
+						newArg._string = "[#]";
+					}
+					else
+					{
+						newArg._type = ArgType::Numeral;
+						newArg._string = "#";
+					}
+
+					opcode.addArgument(newArg);
+
+					if (assembler.echoParsedMinor() && assembler.echoArchitecture())
+					{
+						if (!isAddress)
+							std::cout << "					*** Adding an immediate value argument = " << newArg._string << "\n";
+						else
+							std::cout << "					*** Adding a dereferenced value argument = " << newArg._string << "\n";
+					}
+				}
+				else if (assembler.getSymbolType(tokenString) == SymbolType::Register)
+				{
+					opcode::arg newArg;
+					if (isAddress)
+					{
+						newArg._type = ArgType::DerefReg;
+						newArg._string = "[" + tokenString + "]";
+					}
+					else
+					{
+						newArg._type = ArgType::Register;
+						newArg._string = tokenString;
+					}
+
+					opcode.addArgument(newArg);
+
+					if (assembler.echoParsedMinor() && assembler.echoArchitecture())
+					{
+						if (!isAddress)
+							std::cout << "					*** Adding a register value argument = " << newArg._string << "\n";
+						else
+							std::cout << "					*** Adding a dereferenced register value argument = " << newArg._string << "\n";
+					}
+				}
+				else
+				{
+					if (num == -1)
+						num = 0;
+
+					if (op == Operation::OR)
+					{
+						if (tokenString[0] == '_')
+							num = num ^ assembler.getSymbolAddress(tokenString);
+						else
+							num = num | assembler.getSymbolAddress(tokenString);
+
+						op = Operation::None;
+					}
+					else
+					{
+						num = assembler.getSymbolAddress(tokenString);
+					}
+				}
+			}
+			else
+			{
+				tokensRemain = false;
+			}
+		}
+
+		assembler.addOpcode(parsedValue, opcode);
+
+		if (num != -1)
+		{
+			controlPattern cp;
+			cp.pattern = num;
+
+			for (int i = 0; i < pow(2, assembler.getFlagCount()); i++)
+			{
+				cp.flags.push_back(i);
+				cp.type = PatternType::Seq;
+			}
+
+			opcode.addNewControlPattern(cp);
+		}
+
+		if (assembler.echoParsedMajor() && assembler.echoArchitecture())
+		{
+			std::cout << "          *** Saving opcode " << std::string(nameToken.value()) << " ";
+
+			for (int i = 0; i < opcode.numArgs(); i++)
+			{
+				std::cout << opcode.getArg(i)._string;
+
+				if (i != opcode.numArgs() - 1)
+					std::cout << ", ";
+			}
+
+			std::cout << " -- val = $";
+			std::cout << hex2 << opcode.value();
+			std::cout << ", control sequence : ";
+
+			for (int i = 0; i < opcode.numCycles(); i++)
+			{
+				for (int j = 0; j < opcode.getPatterns(i).cpattern[0].flags.size(); i++)
+				{
+					controlPattern p = opcode.getPatterns(i).cpattern[0];
+					std::cout << "              " << dec << i << ": $" << hex8 << p.pattern << " and flag pattern = " << p.flags[j] << "\n";
+				}
+			}
+
+			std::cout << ", unique_str = " << opcode.getUniqueString() << "\n";
+		}
+	}
+};

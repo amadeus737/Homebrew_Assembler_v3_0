@@ -44,7 +44,7 @@
     <ClInclude Include="src\directive.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\archDefinition.h">
+    <ClInclude Include="src\archtag.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\util.h">
@@ -54,6 +54,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\symbol.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\instruction.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

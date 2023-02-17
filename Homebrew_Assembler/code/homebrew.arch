@@ -152,3 +152,7 @@ control alu_sid								29 << 27
 ; special
 control fetch = _mem_write_data | _pc_write_addr | ir_read_data | pc_inc
 #endregion
+
+opcode $00 nop
+opcode $01 mov a, #
+opcode $02 mov a, b

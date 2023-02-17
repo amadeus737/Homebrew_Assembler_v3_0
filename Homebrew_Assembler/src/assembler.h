@@ -53,7 +53,7 @@ public:
 	// general stuff
 	void setInstructionWidth(int i) { _instructionWidth = i; }
 	void setAddressWidth(int a) { _addressWidth = a; }
-	int getInstructionWidht() { return _instructionWidth; }
+	int getInstructionWidth() { return _instructionWidth; }
 	int getAddressWidth() { return _addressWidth; }
 
 	// Symbol stuff
@@ -112,12 +112,18 @@ private:
 	}
 
 	template <class a>
-	void registerArchDefinition(std::string name)
+	void registerArchTag(std::string name)
 	{
-		assert(_archDefinitions.count(name) == 0);
-		_archDefinitions.emplace(name, std::make_unique<a>());
+		assert(_archtags.count(name) == 0);
+		_archtags.emplace(name, std::make_unique<a>());
 	}
 
+	template <class i>
+	void registerInstruction(std::string name)
+	{
+		assert(_instructions.count(name) == 0);
+		_instructions.emplace(name, std::make_unique<i>());
+	}
 
 private:
 	// file stuff
@@ -161,9 +167,9 @@ private:
 	int _lastOpcodeIndex = -1;
 
 	// Token identifier stuff
-	std::map<std::string, std::unique_ptr<command>>   _directives;
-	std::map<std::string, std::unique_ptr<command>>	 _archDefinitions;
-	//std::map<std::string, std::unique_ptr<command>> _instructions;
+	std::map<std::string, std::unique_ptr<command>>  _directives;
+	std::map<std::string, std::unique_ptr<command>>	 _archtags;
+	std::map<std::string, std::unique_ptr<command>> _instructions;
 
 	// addressing stuff
 	int _address = 0;

@@ -2,7 +2,8 @@
 #include "parser.h"
 #include "config.h"
 #include "directive.h"
-#include "archDefinition.h"
+#include "archtag.h"
+#include "instruction.h"
 
 #include <sstream>
 
@@ -20,14 +21,17 @@ void assembler::registerOperations()
 	registerDirective<includeDirective>(INCLUDE_STR);
 	registerDirective<originDirective>(ORIGIN_STR);
 
-	registerArchDefinition<archBitWidth>(INSTRUCTION_WIDTH_STR);
-	registerArchDefinition<archBitWidth>(ADDRESS_WIDTH_STR);
-	registerArchDefinition<archRom>(DECODER_ROM_STR);
-	registerArchDefinition<archRom>(PROGRAM_ROM_STR);
-	registerArchDefinition<archRegister>(REGISTER_STR);
-	registerArchDefinition<archFlagDevice>(FLAG_STR);
-	registerArchDefinition<archFlagDevice>(DEVICE_STR);
-	registerArchDefinition<archControlLine>(CONTROL_STR);
+	registerArchTag<archBitWidth>(INSTRUCTION_WIDTH_STR);
+	registerArchTag<archBitWidth>(ADDRESS_WIDTH_STR);
+	registerArchTag<archRom>(DECODER_ROM_STR);
+	registerArchTag<archRom>(PROGRAM_ROM_STR);
+	registerArchTag<archRegister>(REGISTER_STR);
+	registerArchTag<archFlagDevice>(FLAG_STR);
+	registerArchTag<archFlagDevice>(DEVICE_STR);
+	registerArchTag<archControlLine>(CONTROL_STR);
+	registerArchTag<archOpcode>(OPCODE_STR);
+
+	registerInstruction<opcodeInstruction>(OPCODE_STR);
 }
 
 void assembler::assemble()
@@ -156,9 +160,9 @@ void assembler::processLine(std::string& line, int linenum, std::optional<std::s
 		}
 		else*/
 		{
-			if (_archDefinitions.count(token.value()) > 0)
+			if (_archtags.count(token.value()) > 0)
 			{
-				_archDefinitions[token.value()]->process(*this, token.value(), line, linenum);
+				_archtags[token.value()]->process(*this, token.value(), line, linenum);
 			}
 		}
 	}
@@ -345,4 +349,9 @@ void assembler::addProgramRom(bool write, int inputs, int outputs)
 	_write_program_rom = write;
 	_in_bits_program = inputs;
 	_out_bits_program = outputs;
+}
+
+void assembler::addByteToProgramRom(int8_t byte, int address)
+{
+	// fill in later!
 }
